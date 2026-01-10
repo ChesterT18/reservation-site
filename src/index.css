@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-pizza-black text-gray-100;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-pizza-red hover:bg-pizza-darkred text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-pizza-yellow hover:bg-pizza-gold text-pizza-black font-semibold py-2 px-6 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-pizza-red text-pizza-red hover:bg-pizza-red hover:text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-pizza-red transition-colors;
+  }
+  
+  .card {
+    @apply bg-gray-900 border border-gray-800 rounded-lg p-6 shadow-lg;
+  }
+}
