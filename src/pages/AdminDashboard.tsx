@@ -1,199 +1,120 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, Users, Pizza as PizzaIcon, TrendingUp, MessageSquare, Plus, Edit, Trash2 } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { Calendar, Plus, Edit, Trash2, X, HelpCircle, Star } from 'lucide-react';
 import { api } from '../api/api';
-import { Analytics } from '../ai/analytics';
 import { format, parseISO } from 'date-fns';
-import type { Reservation, Feedback, MenuItem } from '../types';
-
-interface MenuFormData {
-  name: string;
-  description: string;
-  category: string;
-  price: string;
-  image_url: string;
-  available: number;
-}
-
-interface AvailabilityData {
-  date: string;
-  time_slot: string;
-  max_tables: number | string;
-  max_customers: number | string;
-  blocked: number;
-  reason: string;
-}
-
-interface TableBlockData {
-  date: string;
-  time_slot: string;
-  table_number: number | string;
-  reason: string;
-}
+import type { Reservation, Feedback, MenuItem, DineTable } from '../types';
+import { BarGraphData, getAverageRatingsByCategory, getDailyCompletedReservations, getDailyPeakHours, getDailyTotalGuests, getMonthlyCompletedReservations, getMonthlyPeakHours, getMonthlyTotalGuests, getReservationStatusBreakdown, getTopOrderedFood, getTopRatedFoods, getTopReservedTables, LineGraphData, PieChartData, ReservationStatusBreakdown } from '../ai/analytics2';
+import { scaleSequential } from "d3-scale";
+import { interpolateReds } from "d3-scale-chromatic";
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('overview');
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('analytics');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [filterPeriod, setFilterPeriod] = useState<'week' | 'month' | 'year'>('week');
-  const [insights, setInsights] = useState<any[]>([]);
-  const [showMenuForm, setShowMenuForm] = useState<boolean>(false);
-  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [diningTables, setDiningTables] = useState<DineTable[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [showFloorPlan, setShowFloorPlan] = useState<boolean>(false);
 
-  const [menuFormData, setMenuFormData] = useState<MenuFormData>({
-    name: '',
-    description: '',
-    category: 'Pizza',
-    price: '',
-    image_url: '',
-    available: 1
-  });
+  const years = [2026];
+  const [startYear, setStartYear] = useState<number>(years[0]);
+  const [endYear, setEndYear] = useState<number>(years[0]);
 
-  const [availabilityData, setAvailabilityData] = useState<AvailabilityData>({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    time_slot: '12:00',
-    max_tables: 10,
-    max_customers: 40,
-    blocked: 0,
-    reason: ''
-  });
-
-  const [tableBlockData, setTableBlockData] = useState<TableBlockData>({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    time_slot: '12:00',
-    table_number: 1,
-    reason: ''
-  });
-
-  const timeSlots = [
-    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-    '19:00', '19:30', '20:00', '20:30', '21:00'
-  ];
+  const [reservationStatusBreakdown, setReservationStatusBreakdown] = useState<ReservationStatusBreakdown>();
+  const [dailyCompletedReservations, setDailyCompletedReservations] = useState<LineGraphData>();
+  const [monthlyCompletedReservations, setMonthlyCompletedReservations] = useState<LineGraphData>();
+  const [dailyPeakHours, setDailyPeakHours] = useState<{day: string; hour: number; reservations: number}[]>([]);
+  const [monthlyPeakHours, setMonthlyPeakHours] = useState<{month: string; hour: number; reservations: number}[]>([]);
+  const [dailyTotalGuests, setDailyTotalGuests] = useState<LineGraphData>();
+  const [monthlyTotalGuests, setMonthlyTotalGuests] = useState<LineGraphData>();
+  const [topRatedFood, setTopRatedFood] = useState<MenuItem[]>([]);
+  const [topReservedTables, setTopReservedTables] = useState<PieChartData>();
+  const [topOrderedFood, setTopOrderedFood] = useState<PieChartData>();
+  const [feedbackSummary, setFeedbackSummary] = useState<BarGraphData>();
 
   useEffect(() => {
-    loadData();
+    const fetchData = async () => {
+      await loadData();
+    }
+    fetchData();
   }, []);
 
   const loadData = async () => {
-    // const res = api.reservations.getAll();
-    setReservations([]);
-    // const fb = api.feedbacks.getAll();
-    setFeedbacks([]);
-    const items = await api.foodItems.getAll();
-    setMenuItems(items);
-    // const analyticsInsights = Analytics.generateInsights(res, fb);
-    setInsights([]);
+    const apiReservations = await api.reservations.getAll();
+    setReservations(apiReservations);
+    const apiDiningTables = await api.dineTables.getAll();
+    setDiningTables(apiDiningTables);
+    const apiFeedbacks = await api.feedbacks.getAll();
+    setFeedbacks(apiFeedbacks);
+    const apiMenu = await api.foodItems.getAll();
+    setMenuItems(apiMenu);
+    setReservationStatusBreakdown(getReservationStatusBreakdown(apiReservations));
+    if (apiReservations && startYear && endYear) {
+      setDailyCompletedReservations(getDailyCompletedReservations(apiReservations, startYear, endYear));
+      setMonthlyCompletedReservations(getMonthlyCompletedReservations(apiReservations, startYear, endYear));
+      setDailyPeakHours(getDailyPeakHours(apiReservations, startYear, endYear));
+      setMonthlyPeakHours(getMonthlyPeakHours(apiReservations, startYear, endYear));
+      setDailyTotalGuests(getDailyTotalGuests(apiReservations, startYear, endYear));
+      setMonthlyTotalGuests(getMonthlyTotalGuests(apiReservations, startYear, endYear));
+      setTopReservedTables(getTopReservedTables(apiReservations, apiDiningTables, startYear, endYear));
+      setTopOrderedFood(getTopOrderedFood(apiReservations, startYear, endYear));
+      setFeedbackSummary(getAverageRatingsByCategory(apiFeedbacks, startYear, endYear));
+      const a = getTopRatedFoods(apiMenu, startYear, endYear);
+      const topmenu: MenuItem[] = [];
+      a.forEach(i => {
+        const m = apiMenu.find(x => x.id === i.foodId);
+        if (m) topmenu.push(m);
+      })
+      setTopRatedFood(topmenu);
+    }
   };
 
-  const handleStatusUpdate = (id: number, status: string) => {
-    // api.reservations.updateStatus(id, status);
-    api.reservations.updateStatus();
-    loadData();
+  useEffect(() => {
+    setDailyCompletedReservations(getDailyCompletedReservations(reservations, startYear, endYear));
+    setMonthlyCompletedReservations(getMonthlyCompletedReservations(reservations, startYear, endYear));
+    setDailyPeakHours(getDailyPeakHours(reservations, startYear, endYear));
+    setMonthlyPeakHours(getMonthlyPeakHours(reservations, startYear, endYear));
+    setDailyTotalGuests(getDailyTotalGuests(reservations, startYear, endYear));
+    setMonthlyTotalGuests(getMonthlyTotalGuests(reservations, startYear, endYear));
+  }, [reservations, startYear, endYear]);
+
+  const renderStars = (averageRating: number, perfectRating: number) => {
+    const stars = [];
+    for (let i = 1; i <= perfectRating; i++) {
+      const isFilled = i <= Math.round(averageRating);
+      stars.push(
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            isFilled ? 'fill-pizza-yellow text-pizza-yellow' : 'text-gray-600'
+          }`}
+        />
+      );
+    }
+    return stars;
+  };
+  
+  const handleStatusUpdate = async (res: Reservation, status: any) => {
+    res.status = status;
+    await api.reservations.update(res);
+    await loadData();
   };
 
   const handleMenuSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (editingMenuItem) {
-      api.foodItems.update(
-        // editingMenuItem.id,
-        // menuFormData.name,
-        // menuFormData.description,
-        // menuFormData.category,
-        // parseFloat(menuFormData.price),
-        // menuFormData.image_url,
-        // menuFormData.available
-      );
-    } else {
-      api.foodItems.create(
-        // menuFormData.name,
-        // menuFormData.description,
-        // menuFormData.category,
-        // parseFloat(menuFormData.price),
-        // menuFormData.image_url
-      );
-    }
-    loadData();
-    setShowMenuForm(false);
-    setEditingMenuItem(null);
-    setMenuFormData({ name: '', description: '', category: 'Pizza', price: '', image_url: '', available: 1 });
   };
-
-  const handleMenuDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this menu item?')) {
-      // api.foodItems.delete(id);
-      api.foodItems.delete();
-      loadData();
-    }
-  };
-
-  const handleMenuEdit = (item: MenuItem) => {
-    setEditingMenuItem(item);
-    setMenuFormData({
-      name: item.name,
-      description: item.description,
-      category: item.category,
-      price: item.price.toString(),
-      image_url: item.imgUrl,
-      available: 1
-    });
-    setShowMenuForm(true);
-  };
-
-  const handleAvailabilitySubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // api.availability.set(
-    //   availabilityData.date,
-    //   availabilityData.time_slot,
-    //   typeof availabilityData.max_tables === 'string' ? parseInt(availabilityData.max_tables) : availabilityData.max_tables,
-    //   typeof availabilityData.max_customers === 'string' ? parseInt(availabilityData.max_customers) : availabilityData.max_customers,
-    //   availabilityData.blocked,
-    //   availabilityData.reason
-    // );
-    // setAvailabilityData({
-    //   date: format(new Date(), 'yyyy-MM-dd'),
-    //   time_slot: '12:00',
-    //   max_tables: 10,
-    //   max_customers: 40,
-    //   blocked: 0,
-    //   reason: ''
-    // });
-  };
-
-  const handleTableBlockSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // api.tableBlocks.create(
-    //   tableBlockData.date,
-    //   tableBlockData.time_slot,
-    //   typeof tableBlockData.table_number === 'string' ? parseInt(tableBlockData.table_number) : tableBlockData.table_number,
-    //   tableBlockData.reason
-    // );
-    // setTableBlockData({
-    //   date: format(new Date(), 'yyyy-MM-dd'),
-    //   time_slot: '12:00',
-    //   table_number: 1,
-    //   reason: ''
-    // });
-  };
-
-  const peakHoursData = Analytics.analyzePeakHours(reservations);
-  const demandData = Analytics.analyzeDemandByDate(reservations, filterPeriod);
-  const mostOrderedItems = Analytics.analyzeMostOrderedItems(reservations);
-  const sentimentAnalysis = Analytics.analyzeSentiment(feedbacks);
-  const peakPrediction = Analytics.predictPeakHours(reservations);
-
+  
   return (
     <div className="min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-pizza-yellow mb-8">Admin Dashboard</h1>
 
-        <div className="flex space-x-4 mb-8 overflow-x-auto">
-          {['overview', 'reservations', 'analytics', 'menu', 'availability', 'feedbacks'].map(tab => (
+        <div className="flex space-x-4 mb-8 w-full">
+          {['analytics', 'reservations', 'feedbacks', 'menu'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-lg font-semibold whitespace-nowrap transition ${
+              className={`flex-1 py-2 rounded-lg font-semibold whitespace-nowrap transition text-center ${
                 activeTab === tab
                   ? 'bg-pizza-red text-white'
                   : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -204,113 +125,606 @@ const AdminDashboard: React.FC = () => {
           ))}
         </div>
 
-        {activeTab === 'overview' && (
+        {activeTab === 'analytics' && (
+
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm">Total Reservations</p>
-                    <p className="text-3xl font-bold text-pizza-yellow">{reservations.length}</p>
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <label className="text-gray-300">Start Year :</label>
+                <select 
+                  className="bg-gray-700 text-white rounded px-3 py-1"
+                  value={startYear}
+                  onChange={(e) => setStartYear(parseInt(e.target.value))}
+                >
+                  {years.map(year => (
+                    <option key={`start-${year}`} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-gray-300">End Year :</label>
+                <select 
+                  className="bg-gray-700 text-white rounded px-3 py-1"
+                  value={endYear}
+                  onChange={(e) => setEndYear(parseInt(e.target.value))}
+                >
+                  {years.map(year => (
+                    <option key={`end-${year}`} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-pizza-yellow mb-4">Total Reservations : {reservationStatusBreakdown?.total}</h2>
+            {reservationStatusBreakdown && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div className="card p-4">
+                  <div className="flex items-center justify-between h-full">
+                    <div>
+                      <p className="text-gray-400 text-sm">Active Reservations</p>
+                      <p className="text-3xl font-bold text-cyan-500">{reservationStatusBreakdown.active}</p>
+                    </div>
+                    <Calendar className="w-10 h-10 text-cyan-500" />
                   </div>
-                  <Calendar className="w-12 h-12 text-pizza-red" />
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center justify-between h-full">
+                    <div>
+                      <p className="text-gray-400 text-sm">Completed</p>
+                      <p className="text-3xl font-bold text-green-500">{reservationStatusBreakdown.completed}</p>
+                    </div>
+                    <Calendar className="w-10 h-10 text-green-500" />
+                  </div>
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center justify-between h-full">
+                    <div>
+                      <p className="text-gray-400 text-sm">No-Shows</p>
+                      <p className="text-3xl font-bold text-red-500">{reservationStatusBreakdown.noshow}</p>
+                    </div>
+                    <Calendar className="w-10 h-10 text-red-500" />
+                  </div>
+                </div>
+              </div>
+            )}
+          
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Total Daily Completed Reservations</h3>
+                <div className="h-64">
+                  {dailyCompletedReservations && dailyCompletedReservations.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={dailyCompletedReservations.labels.map((label, index) => ({
+                          day: label,
+                          reservations: dailyCompletedReservations.data[index] || 0
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          dataKey="day" 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="reservations" 
+                          name="Reservations"
+                          stroke="#06B6D4"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm">Pending</p>
-                    <p className="text-3xl font-bold text-yellow-400">
-                      {reservations.filter(r => r.status === 'pending').length}
-                    </p>
-                  </div>
-                  <Users className="w-12 h-12 text-yellow-400" />
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm">Menu Items</p>
-                    <p className="text-3xl font-bold text-pizza-yellow">{menuItems.length}</p>
-                  </div>
-                  <PizzaIcon className="w-12 h-12 text-pizza-red" />
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm">Avg Rating</p>
-                    <p className="text-3xl font-bold text-pizza-yellow">{sentimentAnalysis.avgRating}</p>
-                  </div>
-                  <MessageSquare className="w-12 h-12 text-pizza-red" />
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Total Monthly Completed Reservations</h3>
+                <div className="h-64">
+                  {monthlyCompletedReservations && monthlyCompletedReservations.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={monthlyCompletedReservations.labels.map((label, index) => ({
+                          month: label,
+                          reservations: monthlyCompletedReservations.data[index] || 0
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          dataKey="month" 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="reservations" 
+                          name="Reservations"
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="card">
-              <h2 className="text-2xl font-bold text-pizza-yellow mb-4">AI Insights</h2>
-              <div className="space-y-3">
-                {insights.map((insight, idx) => (
-                  <div key={idx} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
-                    <TrendingUp className="w-6 h-6 text-pizza-red mt-1" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-pizza-yellow">{insight.title}</h3>
-                      <p className="text-gray-300 text-sm">{insight.description}</p>
-                      <p className="text-xs text-gray-500 mt-1">Confidence: {insight.confidence}%</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Daily Peak Hours Heatmap</h3>
+                <div className="overflow-x-auto">
+                  {dailyPeakHours && dailyPeakHours.length > 0 ? (
+                    <div className="inline-block min-w-full">
+                      <div className="flex gap-1 mb-2">
+                        <div className="w-16"></div>
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                          <div key={day} className="flex-1 text-center text-xs text-gray-400 min-w-[40px]">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      {(() => {
+                        const hours = Array.from(new Set(dailyPeakHours.map(d => d.hour))).sort((a, b) => a - b);
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const maxReservations = Math.max(...dailyPeakHours.map(d => d.reservations));
+                        const colorScale = scaleSequential(interpolateReds).domain([0, maxReservations]);
+                        
+                        return hours.map((hour) => (
+                          <div key={hour} className="flex gap-1 mb-1">
+                            <div className="w-16 text-xs text-gray-400 flex items-center justify-end pr-2">
+                              {hour.toString().padStart(2, '0')}:00
+                            </div>
+                            {days.map((day) => {
+                              const dataPoint = dailyPeakHours.find(d => d.day === day && d.hour === hour);
+                              const count = dataPoint?.reservations || 0;
+                              const color = count > 0 ? colorScale(count) : '#1F2937';
+                              
+                              return (
+                                <div
+                                  key={`${day}-${hour}`}
+                                  className="flex-1 aspect-2/1 rounded-sm min-w-[40px] min-h-[40px] border border-gray-700 hover:border-pizza-yellow transition-colors cursor-pointer group relative"
+                                  style={{ backgroundColor: color }}
+                                  title={`${day} ${hour}:00 - ${count} reservations`}
+                                >
+                                  <div className="absolute hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-10 border border-gray-700">
+                                    {count} reservations
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                      <div className="flex items-center gap-2 mt-4 text-xs text-gray-400">
+                        <span>Less</span>
+                        <div className="flex gap-1">
+                          {[0, 0.25, 0.5, 0.75, 1].map((val, idx) => {
+                            const maxReservations = Math.max(...dailyPeakHours.map(d => d.reservations));
+                            const colorScale = scaleSequential(interpolateReds).domain([0, maxReservations]);
+                            const color = val === 0 ? '#1F2937' : colorScale(val * maxReservations);
+                            return (
+                              <div
+                                key={idx}
+                                className="w-3 h-3 rounded-sm border border-gray-700"
+                                style={{ backgroundColor: color }}
+                              />
+                            );
+                          })}
+                        </div>
+                        <span>More</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-gray-500">
+                      No peak hours data available
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Monthly Peak Hours Heatmap</h3>
+                <div className="overflow-x-auto">
+                  {monthlyPeakHours && monthlyPeakHours.length > 0 ? (
+                    <div className="inline-block min-w-full">
+                      <div className="flex gap-1 mb-2">
+                        <div className="w-16"></div>
+                        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
+                          <div key={month} className="flex-1 text-center text-xs text-gray-400 min-w-[32px]">
+                            {month}
+                          </div>
+                        ))}
+                      </div>
+                      {(() => {
+                        const hours = Array.from(new Set(monthlyPeakHours.map(d => d.hour))).sort((a, b) => a - b);
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const maxReservations = Math.max(...monthlyPeakHours.map(d => d.reservations));
+                        const colorScale = scaleSequential(interpolateReds).domain([0, maxReservations]);
+                        
+                        return hours.map((hour) => (
+                          <div key={hour} className="flex gap-1 mb-1">
+                            <div className="w-16 text-xs text-gray-400 flex items-center justify-end pr-2">
+                              {hour.toString().padStart(2, '0')}:00
+                            </div>
+                            {months.map((month) => {
+                              const dataPoint = monthlyPeakHours.find(d => d.month === month && d.hour === hour);
+                              const count = dataPoint?.reservations || 0;
+                              const color = count > 0 ? colorScale(count) : '#1F2937';
+                              
+                              return (
+                                <div
+                                  key={`${month}-${hour}`}
+                                  className="flex-1 aspect-square rounded-sm min-w-[32px] min-h-[32px] border border-gray-700 hover:border-pizza-yellow transition-colors cursor-pointer group relative"
+                                  style={{ backgroundColor: color }}
+                                  title={`${month} ${hour}:00 - ${count} reservations`}
+                                >
+                                  <div className="absolute hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-10 border border-gray-700">
+                                    {count} reservations
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                      <div className="flex items-center gap-2 mt-4 text-xs text-gray-400">
+                        <span>Less</span>
+                        <div className="flex gap-1">
+                          {[0, 0.25, 0.5, 0.75, 1].map((val, idx) => {
+                            const maxReservations = Math.max(...monthlyPeakHours.map(d => d.reservations));
+                            const colorScale = scaleSequential(interpolateReds).domain([0, maxReservations]);
+                            const color = val === 0 ? '#1F2937' : colorScale(val * maxReservations);
+                            return (
+                              <div
+                                key={idx}
+                                className="w-3 h-3 rounded-sm border border-gray-700"
+                                style={{ backgroundColor: color }}
+                              />
+                            );
+                          })}
+                        </div>
+                        <span>More</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-gray-500">
+                      No peak hours data available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Total Daily Guests</h3>
+                <div className="h-64">
+                  {dailyTotalGuests && dailyTotalGuests.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={dailyTotalGuests.labels.map((label, index) => ({
+                          day: label,
+                          guests: dailyTotalGuests.data[index] || 0
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          dataKey="day" 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="guests" 
+                          name="Guests"
+                          stroke="#10B981"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Total Monthly Guests</h3>
+                <div className="h-64">
+                  {monthlyTotalGuests && monthlyTotalGuests.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={monthlyTotalGuests.labels.map((label, index) => ({
+                          month: label,
+                          guests: monthlyTotalGuests.data[index] || 0
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          dataKey="month" 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="guests" 
+                          name="Guests"
+                          stroke="#8B5CF6"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Top Ordered Food</h3>
+                <div className="h-64">
+                  {topOrderedFood && topOrderedFood.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={topOrderedFood.labels.map((label, index) => ({
+                            name: label,
+                            value: topOrderedFood.data[index] || 0
+                          }))}
+                          cx="35%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {topOrderedFood.labels.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={['#DC2626', '#F59E0B', '#10B981', '#06B6D4', '#8B5CF6', '#EC4899'][index % 6]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Legend 
+                          layout="vertical"
+                          align="right"
+                          verticalAlign="middle"
+                          wrapperStyle={{ paddingLeft: '20px' }}
+                          formatter={(value, entry: any) => {
+                            const percent = entry.payload.percent * 100;
+                            return `${value}: ${percent.toFixed(0)}%`;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Top Reserved Tables</h3>
+                <div className="h-64">
+                  {topReservedTables && topReservedTables.labels.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={topReservedTables.labels.map((label, index) => ({
+                            name: label,
+                            value: topReservedTables.data[index] || 0
+                          }))}
+                          cx="35%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {topReservedTables.labels.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={['#06B6D4', '#10B981', '#F59E0B', '#DC2626', '#8B5CF6', '#EC4899'][index % 6]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                        />
+                        <Legend 
+                          layout="vertical"
+                          align="right"
+                          verticalAlign="middle"
+                          wrapperStyle={{ paddingLeft: '20px' }}
+                          formatter={(value, entry: any) => {
+                            const percent = entry.payload.percent * 100;
+                            return `${value}: ${percent.toFixed(0)}%`;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-pizza-yellow mb-4">Customer Ratings and Feedbacks</h2>
+
+            <div className="card p-4">
+              <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Top Rated Foods</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {topRatedFood && topRatedFood.map(item => (
+                  <div key={item.id} className="card hover:border-pizza-red transition">
+                    <div 
+                      className="flex justify-center mb-4"
+                      // onClick={() => handleImageClick(item.imgUrl)}
+                    >
+                      <div className="w-full h-48 bg-gray-800 rounded-lg overflow-hidden">
+                        <img 
+                          src={item.imgUrl} 
+                          alt={item.name}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-pizza-yellow mb-2 line-clamp-1 text-ellipsis break-words">
+                      <span className="text-lg line-clamp-2 text-ellipsis break-words">{item.name}</span>
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">{item.description}</p>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-2xl font-bold text-pizza-red">${item.price.toFixed(2)}</span>
+                      <span className="text-sm text-gray-500 bg-gray-800 px-3 py-1 rounded">
+                        {item.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center">
+                        {renderStars(item.averageRating, item.perfectRating)}
+                      </div>
+                      <span className="text-sm text-gray-400">({item.noOfReviews} reviews)</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="card">
-                <h2 className="text-2xl font-bold text-pizza-yellow mb-4">Peak Hours</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={peakHoursData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis dataKey="hour" stroke="#9CA3AF" />
-                    <YAxis stroke="#9CA3AF" />
-                    <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none' }} />
-                    <Bar dataKey="reservations" fill="#DC2626" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="card">
-                <h2 className="text-2xl font-bold text-pizza-yellow mb-4">Customer Sentiment</h2>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300">Overall Sentiment:</span>
-                    <span className={`px-3 py-1 rounded font-semibold ${
-                      sentimentAnalysis.overall === 'positive' ? 'bg-green-900 text-green-200' :
-                      sentimentAnalysis.overall === 'neutral' ? 'bg-yellow-900 text-yellow-200' :
-                      'bg-red-900 text-red-200'
-                    }`}>
-                      {sentimentAnalysis.overall}
-                    </span>
+            <div className="card p-4">
+              <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Average Feedback Ratings by Category</h3>
+              <div className="h-64">
+                {feedbackSummary && feedbackSummary.labels.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={feedbackSummary.labels.map((label, index) => ({
+                        category: label,
+                        rating: feedbackSummary.data[index] || 0
+                      }))}
+                      margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                      <XAxis 
+                        dataKey="category" 
+                        tick={{ fill: '#9CA3AF' }}
+                        tickLine={{ stroke: '#4B5563' }}
+                        angle={0}
+                        textAnchor="middle"
+                        height={20}
+                      />
+                      <YAxis 
+                        tick={{ fill: '#9CA3AF' }}
+                        tickLine={{ stroke: '#4B5563' }}
+                        domain={[0, 5]}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1F2937',
+                          borderColor: '#4B5563',
+                          borderRadius: '0.5rem'
+                        }}
+                      />
+                      <Bar 
+                        dataKey="rating" 
+                        name="Average Rating"
+                        fill="#F59E0B"
+                      >
+                        {feedbackSummary.labels.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={['#DC2626', '#F59E0B', '#10B981', '#06B6D4', '#8B5CF6', '#EC4899'][index % 6]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    No feedback data available for the selected period
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Positive</span>
-                      <span className="text-green-400">{sentimentAnalysis.distribution.positive}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Neutral</span>
-                      <span className="text-yellow-400">{sentimentAnalysis.distribution.neutral}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Negative</span>
-                      <span className="text-red-400">{sentimentAnalysis.distribution.negative}</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm mt-4">{sentimentAnalysis.summary}</p>
-                </div>
+                )}
               </div>
             </div>
+
           </div>
         )}
 
@@ -322,34 +736,47 @@ const AdminDashboard: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-800">
-                      <th className="text-left py-3 px-4 text-gray-400">ID</th>
                       <th className="text-left py-3 px-4 text-gray-400">Customer</th>
                       <th className="text-left py-3 px-4 text-gray-400">Date</th>
-                      <th className="text-left py-3 px-4 text-gray-400">Time</th>
+                      <th className="text-left py-3 px-4 text-gray-400">Start Time</th>
+                      <th className="text-left py-3 px-4 text-gray-400">End Time</th>
                       <th className="text-left py-3 px-4 text-gray-400">Guests</th>
+                      <th className="text-left py-3 px-4 text-gray-400">
+                        Table 
+                        <button
+                          type="button"
+                          onClick={() => setShowFloorPlan(true)}
+                          className="ml-2 inline-flex items-center justify-center text-pizza-yellow hover:text-pizza-gold transition-colors"
+                          aria-label="View floor plan"
+                        >
+                          <HelpCircle className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="text-left py-3 px-4 text-gray-400">Total Amount</th>
                       <th className="text-left py-3 px-4 text-gray-400">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reservations.map(res => (
                       <tr key={res.id} className="border-b border-gray-800 hover:bg-gray-800">
-                        <td className="py-3 px-4 text-gray-300">{res.id}</td>
-                        <td className="py-3 px-4 text-gray-300">{res.user_name}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.userName}</td>
                         <td className="py-3 px-4 text-gray-300">
-                          {format(parseISO(res.reservation_date), 'MMM dd, yyyy')}
+                          {format(parseISO(res.date), 'MMM dd, yyyy')}
                         </td>
-                        <td className="py-3 px-4 text-gray-300">{res.reservation_time}</td>
-                        <td className="py-3 px-4 text-gray-300">{res.num_people}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.startTime}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.endTime}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.pax}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.tableIds.map(tableId => diningTables.find(table => table.id === tableId)?.name).join(', ')}</td>
+                        <td className="py-3 px-4 text-gray-300">{res.totalAmount}</td>
                         <td className="py-3 px-4">
                           <select
                             value={res.status}
-                            onChange={(e) => handleStatusUpdate(res.id, e.target.value)}
+                            onChange={(e) => handleStatusUpdate(res, e.target.value)}
                             className="bg-gray-700 text-white px-2 py-1 rounded text-sm"
                           >
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
+                            <option value="active">Active</option>
                             <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
+                            <option value="noshow">No Show</option>
                           </select>
                         </td>
                       </tr>
@@ -361,207 +788,16 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            <div className="card">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-pizza-yellow">Demand Forecasting</h2>
-                <select
-                  value={filterPeriod}
-                  onChange={(e) => setFilterPeriod(e.target.value as 'week' | 'month' | 'year')}
-                  className="bg-gray-800 text-white px-4 py-2 rounded"
-                >
-                  <option value="week">Weekly</option>
-                  <option value="month">Monthly</option>
-                  <option value="year">Yearly</option>
-                </select>
-              </div>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={demandData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="customers" stroke="#DC2626" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="card">
-              <h2 className="text-2xl font-bold text-pizza-yellow mb-4">Peak Hours Prediction</h2>
-              <div className="bg-gray-800 p-6 rounded-lg">
-                <p className="text-gray-300 text-lg mb-2">{peakPrediction.prediction}</p>
-                <p className="text-sm text-gray-500">Confidence: {peakPrediction.confidence.toFixed(0)}%</p>
-                {peakPrediction.peakHours.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-gray-400 mb-2">Predicted Peak Hours:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {peakPrediction.peakHours.map(hour => (
-                        <span key={hour} className="bg-pizza-red px-3 py-1 rounded text-white">
-                          {hour}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'menu' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-pizza-yellow">Menu Management</h2>
-              <button
-                onClick={() => {
-                  setShowMenuForm(true);
-                  setEditingMenuItem(null);
-                  setMenuFormData({ name: '', description: '', category: 'Pizza', price: '', image_url: '', available: 1 });
-                }}
-                className="btn-primary flex items-center space-x-2"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Add Menu Item</span>
-              </button>
-            </div>
-
-            {showMenuForm && (
-              <div className="card">
-                <h3 className="text-xl font-bold text-pizza-yellow mb-4">
-                  {editingMenuItem ? 'Edit Menu Item' : 'Add New Menu Item'}
-                </h3>
-                <form onSubmit={handleMenuSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Name</label>
-                      <input
-                        type="text"
-                        value={menuFormData.name}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, name: e.target.value })}
-                        className="input-field"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-                      <select
-                        value={menuFormData.category}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, category: e.target.value })}
-                        className="input-field"
-                      >
-                        <option value="Pizza">Pizza</option>
-                        <option value="Appetizers">Appetizers</option>
-                        <option value="Salads">Salads</option>
-                        <option value="Desserts">Desserts</option>
-                        <option value="Beverages">Beverages</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={menuFormData.price}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, price: e.target.value })}
-                        className="input-field"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Available</label>
-                      <select
-                        value={menuFormData.available}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, available: parseInt(e.target.value) })}
-                        className="input-field"
-                      >
-                        <option value={1}>Yes</option>
-                        <option value={0}>No</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                    <textarea
-                      value={menuFormData.description}
-                      onChange={(e) => setMenuFormData({ ...menuFormData, description: e.target.value })}
-                      className="input-field"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Image URL</label>
-                    <input
-                      type="text"
-                      value={menuFormData.image_url}
-                      onChange={(e) => setMenuFormData({ ...menuFormData, image_url: e.target.value })}
-                      className="input-field"
-                    />
-                  </div>
-                  <div className="flex space-x-4">
-                    <button type="submit" className="btn-primary">
-                      {editingMenuItem ? 'Update' : 'Create'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowMenuForm(false)}
-                      className="btn-outline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {menuItems.map(item => (
-                <div key={item.id} className="card">
-                  <h3 className="text-lg font-bold text-pizza-yellow mb-2">{item.name}</h3>
-                  <p className="text-gray-400 text-sm mb-2">{item.description}</p>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-xl font-bold text-pizza-red">${item.price.toFixed(2)}</span>
-                    {/*
-                    <span className={`text-sm px-2 py-1 rounded ${
-                      item.available ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
-                    }`}>
-                      {item.available ? 'Available' : 'Unavailable'}
-                    </span>
-                    */}
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleMenuEdit(item)}
-                      className="flex-1 bg-pizza-yellow text-pizza-black py-2 rounded hover:bg-pizza-gold transition"
-                    >
-                      <Edit className="w-4 h-4 inline mr-1" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleMenuDelete(item.id)}
-                      className="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 transition"
-                    >
-                      <Trash2 className="w-4 h-4 inline mr-1" />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {activeTab === 'feedbacks' && (
           <div className="space-y-6">
             <div className="card">
               <h2 className="text-2xl font-bold text-pizza-yellow mb-6">Customer Feedbacks</h2>
               <div className="space-y-4">
-                {feedbacks.map(feedback => (
+                {/** feedbacks.map(feedback => (
                   <div key={feedback.id} className="bg-gray-800 p-4 rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="text-pizza-yellow font-semibold">{feedback.user_name}</p>
+                        <p className="text-pizza-yellow font-semibold">{feedback.}</p>
                         <p className="text-sm text-gray-500">
                           {feedback.created_at && format(parseISO(feedback.created_at), 'MMM dd, yyyy')}
                         </p>
@@ -579,14 +815,248 @@ const AdminDashboard: React.FC = () => {
                       {feedback.category}
                     </span>
                   </div>
-                ))}
+                ))*/}
               </div>
             </div>
           </div>
         )}
+
+        {activeTab === 'menu' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-pizza-yellow">Menu Management</h2>
+              <button
+                // onClick={() => {
+                //   setShowMenuForm(true);
+                //   setEditingMenuItem(null);
+                //   setMenuFormData({ name: '', description: '', category: 'Pizza', price: '', image_url: '', available: 1 });
+                // }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Menu Item</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {menuItems.map(item => (
+                <div key={item.id} className="card">
+                  <h3 className="text-lg font-bold text-pizza-yellow mb-2">{item.name}</h3>
+                  <p className="text-gray-400 text-sm mb-2 line-clamp-2">{item.description}</p>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xl font-bold text-pizza-red">${item.price.toFixed(2)}</span>
+                    {/*
+                    <span className={`text-sm px-2 py-1 rounded ${
+                      item.available ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
+                    }`}>
+                      {item.available ? 'Available' : 'Unavailable'}
+                    </span>
+                    */}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      // onClick={() => handleMenuEdit(item)}
+                      className="flex-1 bg-pizza-yellow text-pizza-black py-2 rounded hover:bg-pizza-gold transition"
+                    >
+                      <Edit className="w-4 h-4 inline mr-1" />
+                      Edit
+                    </button>
+                    <button
+                      // onClick={() => handleMenuDelete(item.id)}
+                      className="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 transition"
+                    >
+                      <Trash2 className="w-4 h-4 inline mr-1" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {showFloorPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowFloorPlan(false)}>
+          <div className="relative bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowFloorPlan(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h3 className="text-2xl font-bold text-pizza-yellow mb-4">Restaurant Floor Plan</h3>
+            <img
+              src="/src/media/restaurant-floor-plan.png"
+              alt="Restaurant Floor Plan"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default AdminDashboard;
+
+{/** 
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Daily Peak Hours</h3>
+                <div className="h-96">
+                  {dailyPeakHours && dailyPeakHours.data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart
+                        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          type="category" 
+                          dataKey="x" 
+                          name="Day"
+                          allowDuplicatedCategory={false}
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          type="category" 
+                          dataKey="y" 
+                          name="Hour"
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <ZAxis 
+                          type="number" 
+                          dataKey="z" 
+                          range={[100, 1000]} 
+                          name="Reservations"
+                        />
+                        <Tooltip 
+                          cursor={{ strokeDasharray: '3 3' }}
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'Reservations') return [value, name];
+                            return [value, name];
+                          }}
+                        />
+                        <Scatter 
+                          name="Peak Hours" 
+                          data={dailyPeakHours.data.flatMap((row, rowIdx) =>
+                            row.map((value, colIdx) => ({
+                              x: dailyPeakHours.xLabels[colIdx],
+                              y: dailyPeakHours.yLabels[rowIdx],
+                              z: value
+                            }))
+                          )}
+                          fill="#DC2626"
+                        >
+                          {dailyPeakHours.data.flatMap((row, rowIdx) =>
+                            row.map((value, colIdx) => {
+                              const maxValue = Math.max(...dailyPeakHours.data.flat());
+                              const intensity = maxValue > 0 ? value / maxValue : 0;
+                              const opacity = value === 0 ? 0.1 : 0.3 + intensity * 0.7;
+                              return (
+                                <Cell 
+                                  key={`cell-${rowIdx}-${colIdx}`} 
+                                  fill={`rgba(220, 38, 38, ${opacity})`}
+                                />
+                              );
+                            })
+                          )}
+                        </Scatter>
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <h3 className="text-lg font-semibold mb-4 text-pizza-yellow">Monthly Peak Hours</h3>
+                <div className="h-96">
+                  {monthlyPeakHours && monthlyPeakHours.data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart
+                        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                        <XAxis 
+                          type="category" 
+                          dataKey="x" 
+                          name="Month"
+                          allowDuplicatedCategory={false}
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <YAxis 
+                          type="category" 
+                          dataKey="y" 
+                          name="Hour"
+                          tick={{ fill: '#9CA3AF' }}
+                          tickLine={{ stroke: '#4B5563' }}
+                        />
+                        <ZAxis 
+                          type="number" 
+                          dataKey="z" 
+                          range={[100, 1000]} 
+                          name="Reservations"
+                        />
+                        <Tooltip 
+                          cursor={{ strokeDasharray: '3 3' }}
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937',
+                            borderColor: '#4B5563',
+                            borderRadius: '0.5rem'
+                          }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'Reservations') return [value, name];
+                            return [value, name];
+                          }}
+                        />
+                        <Scatter 
+                          name="Peak Hours" 
+                          data={monthlyPeakHours.data.flatMap((row, rowIdx) =>
+                            row.map((value, colIdx) => ({
+                              x: monthlyPeakHours.xLabels[colIdx],
+                              y: monthlyPeakHours.yLabels[rowIdx],
+                              z: value
+                            }))
+                          )}
+                          fill="#F59E0B"
+                        >
+                          {monthlyPeakHours.data.flatMap((row, rowIdx) =>
+                            row.map((value, colIdx) => {
+                              const maxValue = Math.max(...monthlyPeakHours.data.flat());
+                              const intensity = maxValue > 0 ? value / maxValue : 0;
+                              const opacity = value === 0 ? 0.1 : 0.3 + intensity * 0.7;
+                              return (
+                                <Cell 
+                                  key={`cell-${rowIdx}-${colIdx}`} 
+                                  fill={`rgba(245, 158, 11, ${opacity})`}
+                                />
+                              );
+                            })
+                          )}
+                        </Scatter>
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No data available for the selected period
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            */}

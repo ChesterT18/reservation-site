@@ -45,8 +45,8 @@ export class Analytics {
     const hourCounts: { [key: string]: number } = {};
     
     reservations.forEach(reservation => {
-      if (reservation.status !== 'cancelled') {
-        const hour = reservation.reservation_time.split(':')[0];
+      if (reservation.status !== 'overriden') {
+        const hour = reservation.startTime.split(':')[0];
         hourCounts[hour] = (hourCounts[hour] || 0) + 1;
       }
     });
@@ -65,8 +65,8 @@ export class Analytics {
     const dateCounts: { [key: string]: number } = {};
     
     reservations.forEach(reservation => {
-      if (reservation.status !== 'cancelled') {
-        const resDate = new Date(reservation.reservation_date);
+      if (reservation.status !== 'overriden') {
+        const resDate = new Date(reservation.date);
         let key: string;
         
         if (filterType === 'week') {
@@ -79,7 +79,7 @@ export class Analytics {
           key = resDate.getFullYear().toString();
         }
         
-        dateCounts[key] = (dateCounts[key] || 0) + reservation.num_people;
+        dateCounts[key] = (dateCounts[key] || 0) + reservation.pax;
       }
     });
 
@@ -120,9 +120,9 @@ export class Analytics {
     const itemCounts: { [key: string]: number } = {};
     
     reservations.forEach(reservation => {
-      if (reservation.status !== 'cancelled' && reservation.food_items) {
-        reservation.food_items.forEach(item => {
-          itemCounts[item.name] = (itemCounts[item.name] || 0) + 1;
+      if (reservation.status !== 'overriden' && reservation.orders.length > 0) {
+        reservation.orders.forEach(item => {
+          itemCounts[item.foodName] = (itemCounts[item.foodName] || 0) + 1;
         });
       }
     });
@@ -153,15 +153,15 @@ export class Analytics {
     let totalRating = 0;
 
     feedbacks.forEach(feedback => {
-      totalRating += feedback.rating;
+      totalRating += feedback.foodQualityRating;
       
-      const comment = (feedback.comment || '').toLowerCase();
+      const comment = (feedback.foodQualityComment || '').toLowerCase();
       const hasPositive = positiveWords.some(word => comment.includes(word));
       const hasNegative = negativeWords.some(word => comment.includes(word));
 
-      if (feedback.rating >= 4 || hasPositive) {
+      if (feedback.foodQualityRating >= 4 || hasPositive) {
         positive++;
-      } else if (feedback.rating <= 2 || hasNegative) {
+      } else if (feedback.foodQualityRating <= 2 || hasNegative) {
         negative++;
       } else {
         neutral++;
@@ -219,9 +219,9 @@ export class Analytics {
     });
 
     const upcomingReservations = reservations.filter(r => {
-      const resDate = new Date(r.reservation_date);
+      const resDate = new Date(r.date);
       const today = new Date();
-      return resDate >= today && r.status === 'pending';
+      return resDate >= today && r.status === 'active';
     });
 
     if (upcomingReservations.length > 10) {

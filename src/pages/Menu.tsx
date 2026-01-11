@@ -46,7 +46,7 @@ const Menu: React.FC = () => {
       try {
         if (!user) return;
         const dto: UserRating = {
-          userId: user.id,
+          userId: user.id ? user.id : '',
           userName: user.firstName + ' ' + user.lastName,
           foodId: ratingItem.id,
           score: selectedRating,
@@ -141,7 +141,7 @@ const Menu: React.FC = () => {
               </h3>
               <p className="text-gray-400 text-sm mb-4 line-clamp-2">{item.description}</p>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-2xl font-bold text-pizza-red">${item.price.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-pizza-red">₱{item.price.toFixed(2)}</span>
                 <span className="text-sm text-gray-500 bg-gray-800 px-3 py-1 rounded">
                   {item.category}
                 </span>

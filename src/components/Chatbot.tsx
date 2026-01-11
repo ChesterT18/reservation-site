@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SimpleChatbot } from '../ai/chatbot';
 
 const chatbot = new SimpleChatbot();
@@ -10,6 +11,7 @@ interface Message {
 }
 
 const Chatbot: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([
     { text: "Hello! Welcome to Shakey's Pizza! How can I help you today?", sender: 'bot' }
@@ -33,7 +35,13 @@ const Chatbot: React.FC = () => {
 
     setTimeout(() => {
       const botResponse = chatbot.getResponse(input);
-      setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
+      setMessages(prev => [...prev, { text: botResponse.message, sender: 'bot' }]);
+      
+      if (botResponse.navigateTo) {
+        setTimeout(() => {
+          navigate(botResponse.navigateTo!);
+        }, 1500);
+      }
     }, 500);
 
     setInput('');

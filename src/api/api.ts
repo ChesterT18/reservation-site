@@ -87,33 +87,17 @@ export const api = {
 
   auth: {
 
-    register: () => {},
-
-    // register: (
-    //   email: string,
-    //   password: string,
-    //   name: string,
-    //   phone: string,
-    //   role: 'customer' | 'admin' = 'customer',
-    //   securityQuestion: string = '',
-    //   securityAnswer: string = ''
-    // ): ApiResponse => {
-    //   const db = getDatabase();
-    //   if (!db) {
-    //     return { success: false, message: 'Database not initialized' };
-    //   }
-    //   try {
-    //     db.run(
-    //       `INSERT INTO users (email, password, name, phone, role, security_question, security_answer)
-    //        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    //       [email, password, name, phone, role, securityQuestion, securityAnswer]
-    //     );
-    //     saveDatabase();
-    //     return { success: true, message: 'Registration successful' };
-    //   } catch (error) {
-    //     return { success: false, message: 'Email already exists' };
-    //   }
-    // },
+    register: async (user: User): Promise<AuthResponse> => {
+      try {
+        const uri = `/api/user`;
+        const data = await createData<User>(uri, user);
+        if (!data) { return { success: false, message: 'Registration failed' }; }
+        return { success: true, user: data };
+      } catch (error) {
+        console.error('Error:', error);
+        return { success: false, message: 'An error occurred during registration' };
+      }
+    },
 
     login: async (email: string, password: string): Promise<AuthResponse> => {
       try {
@@ -292,7 +276,17 @@ export const api = {
 
   reservations: {
 
-    getAll: () => {},
+    getAll: async (): Promise<Reservation[]> => {
+      try {
+        const uri = `/api/reservations`;
+        const data = await getData<Reservation[]>(uri);
+        if (!data) { return []; }
+        return data;
+      } catch (error) {
+        console.error('Fetch reservations error:', error);
+        return [];
+      }
+    },
 
     getByUser: async (userId: string): Promise<Reservation[]> => {
       try {
@@ -345,9 +339,19 @@ export const api = {
 
   },
 
-  feebacks: {
+  feedbacks: {
 
-    getAll: () => {},
+    getAll: async (): Promise<Feedback[]> => {
+      try {
+        const uri = `/api/feedbacks`;
+        const data = await getData<Feedback[]>(uri);
+        if (!data) { return []; }
+        return data;
+      } catch (error) {
+        console.error('Fetch feedbacks error:', error);
+        return [];
+      }
+    },
 
     create: async (data: Feedback): Promise<Feedback | null> => {
       try {

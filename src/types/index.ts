@@ -5,14 +5,14 @@ export interface AuthResponse {
 }
 
 export interface User {
-  id: string;
+  id?: string;
   email: string;
   password: string;
   firstName: string;
   lastName: string;
   phoneNumber?: string;
   role: 'customer' | 'admin';
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface DineTable {
@@ -29,12 +29,12 @@ export interface Reservation {
   userName: string;
   tableIds: Array<string>;
   orders: Array<ResOrder>;
-  date: string;
-  startTime: string;
-  endTime: string;
+  date: string; // yyyy-MM-dd
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
   pax: number;
   totalAmount?: number;
-  status?: 'active' | 'delayed' | 'overriden' | 'completed';
+  status?: 'active' | 'completed' | 'noshow';
   createdAt?: string;
   updatedAt?: string;
   notes: string;
@@ -52,28 +52,22 @@ export interface ResOrder {
   instructions?: string;
 }
 
-export interface PublicReservation {
-  reservation_date: string;
-  reservation_time: string;
-  num_people: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-}
+// export interface PublicReservation {
+//   reservation_date: string;
+//   reservation_time: string;
+//   num_people: number;
+//   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+// }
 
 export interface ReservationDetails {
-  date: string;
-  time: string;
+  date: string; // yyyy-MM-dd
+  time: string; // HH:mm
   numPeople: number;
   customerName: string;
   customerEmail: string;
   reservationId: string;
   notes?: string;
 }
-
-
-
-
-
-
 
 export interface MenuItem {
   id: string;
@@ -86,10 +80,6 @@ export interface MenuItem {
   averageRating: number;
   perfectRating: number;
 }
-
-
-
-
 
 export interface Feedback {
   id?: string;
@@ -104,6 +94,9 @@ export interface Feedback {
   ambianceComment?: string;
   cleanlinessRating: number;
   cleanlinessComment?: string;
+  valueForMoneyRating: number;
+  valueForMoneyComment?: string;
+  overallRating: number;
   generalFeedback?: string;
   suggestion?: string;
   recommend: 'yes'|'no';
@@ -122,27 +115,25 @@ export interface UserRating {
 
 
 
+// export interface Availability {
+//   id: number;
+//   date: string;
+//   time_slot: string;
+//   max_tables: number;
+//   max_customers: number;
+//   blocked: number;
+//   reason?: string;
+// }
 
-
-export interface Availability {
-  id: number;
-  date: string;
-  time_slot: string;
-  max_tables: number;
-  max_customers: number;
-  blocked: number;
-  reason?: string;
-}
-
-export interface TableBlock {
-  id: number;
-  date: string;
-  time_slot: string;
-  table_number: number;
-  blocked: number;
-  reason?: string;
-  created_at?: string;
-}
+// export interface TableBlock {
+//   id: number;
+//   date: string;
+//   time_slot: string;
+//   table_number: number;
+//   blocked: number;
+//   reason?: string;
+//   created_at?: string;
+// }
 
 export interface ApiResponse<T = any> {
   success: boolean;

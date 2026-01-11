@@ -14,6 +14,7 @@ export default {
           black: '#0F0F0F',
           cream: '#FEF3C7',
           brown: '#78350F',
+          cyan: '#06B6D4',
         }
       }
     },

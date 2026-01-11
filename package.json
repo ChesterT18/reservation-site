@@ -9,8 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@botpress/client": "^1.28.0",
     "@sendgrid/mail": "^8.1.6",
+    "@tensorflow/tfjs": "^4.22.0",
     "compromise": "^14.10.0",
+    "d3-scale": "^4.0.2",
+    "d3-scale-chromatic": "^3.1.0",
     "date-fns": "^2.30.0",
     "dotenv": "^17.2.3",
     "lucide-react": "^0.294.0",
@@ -18,11 +22,12 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
-    "recharts": "^2.10.3",
+    "recharts": "^2.15.4",
     "sql.js": "^1.8.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/d3-scale-chromatic": "^3.1.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

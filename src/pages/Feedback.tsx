@@ -41,7 +41,10 @@ const Feedback: React.FC = () => {
     { id: 'ambienceComment', question: 'Please share any thoughts about atmosphere, music, lighting, or seating comfort. (optional)', type: 'text', value: '' },
     { id: 'cleanlinessRating', question: 'How would you rate the cleanliness of our restaurant?', type: 'rating', value: 0 },
     { id: 'cleanlinessComment', question: 'Please share any thoughts about table cleanliness, restrooms, or overall hygiene. (optional)', type: 'text', value: '' },
-    { id: 'generalFeedback', question: 'Please share any additional feedback you want to share from your experience. (optional)', type: 'text', value: '' },
+    { id: 'valueForMoneyRating', question: 'How would you rate the value for money of your dining experience?', type: 'rating', value: 0 },
+    { id: 'valueForMoneyComment', question: 'Please share any thoughts about pricing, portion size, or whether the experience felt worth the cost. (optional)', type: 'text', value: '' },
+    { id: 'overallRating', question: 'How would you rate your overall experience at our restaurant?', type: 'rating', value: 0 },
+    { id: 'generalFeedback', question: 'Please share any thoughts about your overall impression, highlights, or areas for improvement. (optional)', type: 'text', value: '' },
     { id: 'suggestion', question: 'Please share any additional suggestions or ideas to help us improve your dining experience. (optional)', type: 'text', value: '' },
     { id: 'recommend', question: 'Would you recommend us to your family and friends?', type: 'yesno', value: '' }
   ]);
@@ -66,7 +69,7 @@ const Feedback: React.FC = () => {
     if (!user) return;
 
     const dto: Feedback = {
-      userId: user.id,
+      userId: user.id ? user.id : '',
       userName: user.firstName + ' ' + user.lastName,
       foodQualityRating: surveyQuestions[0].value as number,
       foodQualityComment: surveyQuestions[1].value as string,
@@ -76,13 +79,16 @@ const Feedback: React.FC = () => {
       ambianceComment: surveyQuestions[5].value as string,
       cleanlinessRating: surveyQuestions[6].value as number,
       cleanlinessComment: surveyQuestions[7].value as string,
-      generalFeedback: surveyQuestions[8].value as string,
-      suggestion: surveyQuestions[9].value as string,
-      recommend: surveyQuestions[10].value as any,
+      valueForMoneyRating: surveyQuestions[8].value as number,
+      valueForMoneyComment: surveyQuestions[9].value as string,
+      overallRating: surveyQuestions[10].value as number,
+      generalFeedback: surveyQuestions[11].value as string,
+      suggestion: surveyQuestions[12].value as string,
+      recommend: surveyQuestions[13].value as any,
       favoriteFoodIds: selectedTopFoods.join(','),
     }
     
-    await api.feebacks.create(dto);
+    await api.feedbacks.create(dto);
 
     // Reset survey questions to initial state
     setSurveyQuestions(prev => 

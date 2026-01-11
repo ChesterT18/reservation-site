@@ -82,7 +82,7 @@ const Reservation: React.FC = () => {
 
   const loadData = async () => {
     if (user) {
-      const myRes = await api.reservations.getByUser(user.id);
+      const myRes = await api.reservations.getByUser(user.id as string);
       setMyReservations(myRes);
     }
     // const publicRes = api.reservations.getPublic();
@@ -100,7 +100,7 @@ const Reservation: React.FC = () => {
     if (!user) return;
 
     const dto: Reservation = {
-      userId: user.id,
+      userId: user.id ? user.id : '',
       userName: user.firstName + ' ' + user.lastName,
       tableIds: [],
       orders: [],
@@ -330,7 +330,7 @@ const Reservation: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     <Users className="w-4 h-4 inline mr-2" />
-                    Number of People
+                    Number of Guests
                   </label>
                   <input
                     type="number"
@@ -516,9 +516,8 @@ const Reservation: React.FC = () => {
                         <p className="text-gray-300">{reservation.startTime}-{reservation.endTime} • {reservation.pax} people</p>
                       </div>
                       <span className={`px-3 py-1 rounded text-sm ${
-                        reservation.status === 'delayed' ? 'bg-yellow-900 text-yellow-200' :
-                        reservation.status === 'active' ? 'bg-green-900 text-green-200' :
-                        reservation.status === 'completed' ? 'bg-blue-900 text-blue-200' :
+                        reservation.status === 'active' ? 'bg-yellow-900 text-cyan-200' :
+                        reservation.status === 'completed' ? 'bg-green-900 text-green-green' :
                         'bg-red-900 text-red-200'
                       }`}>
                         {reservation.status}

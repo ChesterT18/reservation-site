@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Pizza, Shield } from 'lucide-react';
 import { api } from '../api/api';
+import { User } from '../types';
 
 interface FormData {
   email: string;
   password: string;
   confirmPassword: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   role: 'customer' | 'admin';
-  securityQuestion: string;
-  securityAnswer: string;
 }
 
 const Register: React.FC = () => {
@@ -19,11 +19,10 @@ const Register: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    name: '',
+    firstName: '',
+    lastName: '',
     phone: '',
     role: 'customer',
-    securityQuestion: '',
-    securityAnswer: ''
   });
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<boolean>(false);
@@ -45,27 +44,23 @@ const Register: React.FC = () => {
       return;
     }
 
-    if (formData.role === 'admin' && !formData.securityAnswer) {
-      setError('Security question answer is required for admin accounts');
-      return;
+    const dto: User = {
+      email: formData.email,
+      password: formData.password,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phoneNumber: formData.phone,
+      role: formData.role
     }
 
-    const result = await api.auth.register(
-      // formData.email,
-      // formData.password,
-      // formData.name,
-      // formData.phone,
-      // formData.role,
-      // formData.securityQuestion,
-      // formData.securityAnswer
-    );
+    const result = await api.auth.register(dto);
 
-    // if (result.success) {
-    //   setSuccess(true);
-    //   setTimeout(() => navigate('/login'), 2000);
-    // } else {
-    //   setError(result.message || 'Registration failed');
-    // }
+    if (result.success) {
+      setSuccess(true);
+      setTimeout(() => navigate('/login'), 2000);
+    } else {
+      setError(result.message || 'Registration failed');
+    }
   };
 
   return (
@@ -93,12 +88,26 @@ const Register: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Full Name
+                First Name
               </label>
               <input
                 type="text"
-                name="name"
-                value={formData.name}
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="input-field"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Last Name
+              </label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
                 onChange={handleChange}
                 className="input-field"
                 required
@@ -173,45 +182,9 @@ const Register: React.FC = () => {
                 />
                 <span className="text-sm text-gray-300 flex items-center">
                   <Shield className="w-4 h-4 mr-1 text-pizza-red" />
-                  Register as Admin (requires security verification)
+                  Register as Admin
                 </span>
               </label>
-
-              {formData.role === 'admin' && (
-                <>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Security Question
-                    </label>
-                    <select
-                      name="securityQuestion"
-                      value={formData.securityQuestion}
-                      onChange={handleChange}
-                      className="input-field"
-                      required
-                    >
-                      <option value="">Select a question</option>
-                      <option value="What is your favorite pizza?">What is your favorite pizza?</option>
-                      <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
-                      <option value="What city were you born in?">What city were you born in?</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Security Answer
-                    </label>
-                    <input
-                      type="text"
-                      name="securityAnswer"
-                      value={formData.securityAnswer}
-                      onChange={handleChange}
-                      className="input-field"
-                      required={formData.role === 'admin'}
-                    />
-                  </div>
-                </>
-              )}
             </div>
 
             <button type="submit" className="w-full btn-primary">

@@ -2,6 +2,11 @@ interface ResponseMap {
   [key: string]: string[];
 }
 
+interface ChatbotResponse {
+  message: string;
+  navigateTo?: string;
+}
+
 export class SimpleChatbot {
   private responses: ResponseMap;
 
@@ -51,46 +56,52 @@ export class SimpleChatbot {
     };
   }
 
-  getResponse(message: string): string {
+  getResponse(message: string): ChatbotResponse {
     const lowerMessage = message.toLowerCase();
     
     if (this.matchesPattern(lowerMessage, ['hello', 'hi', 'hey', 'greetings'])) {
-      return this.randomResponse('greetings');
+      return { message: this.randomResponse('greetings') };
     }
     
     if (this.matchesPattern(lowerMessage, ['menu', 'food', 'pizza', 'what do you have', 'what do you serve'])) {
-      return this.randomResponse('menu');
+      return { 
+        message: this.randomResponse('menu'),
+        navigateTo: '/menu'
+      };
     }
     
     if (this.matchesPattern(lowerMessage, ['hours', 'open', 'close', 'when', 'time'])) {
-      return this.randomResponse('hours');
+      return { message: this.randomResponse('hours') };
     }
     
-    if (this.matchesPattern(lowerMessage, ['reservation', 'reserve', 'book', 'table'])) {
-      return this.randomResponse('reservation');
+    if (this.matchesPattern(lowerMessage, ['reservation', 'reserve', 'book', 'table', 'order'])) {
+      return { 
+        message: this.randomResponse('reservation'),
+        navigateTo: '/reservation'
+      };
     }
     
     if (this.matchesPattern(lowerMessage, ['location', 'where', 'address', 'find you'])) {
-      return this.randomResponse('location');
+      return { message: this.randomResponse('location') };
     }
     
     if (this.matchesPattern(lowerMessage, ['contact', 'phone', 'email', 'call', 'reach'])) {
-      return this.randomResponse('contact');
+      return { message: this.randomResponse('contact') };
     }
     
     if (this.matchesPattern(lowerMessage, ['price', 'cost', 'how much', 'expensive'])) {
-      return this.randomResponse('price');
+      return { message: this.randomResponse('price') };
     }
     
     if (this.matchesPattern(lowerMessage, ['delivery', 'deliver', 'takeout', 'pickup'])) {
-      return this.randomResponse('delivery');
+      return { message: this.randomResponse('delivery') };
     }
     
     if (this.matchesPattern(lowerMessage, ['birthday', 'celebration', 'party', 'event', 'special'])) {
-      return this.randomResponse('special');
+      return { message: this.randomResponse('special') };
     }
     
-    return this.randomResponse('default');
+    return { message: this.randomResponse('default') };
   }
 
   private matchesPattern(message: string, patterns: string[]): boolean {

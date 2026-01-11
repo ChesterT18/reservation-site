@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "reservation-site",
+			"path": "."
+		},
+		{
+			"name": "reservation-app",
+			"path": "../reservation-app"
+		},
+	],
+	"settings": {
+		"task.allowAutomaticTasks": "on",
+		"liveServer.settings.multiRootWorkspaceName": "reservation-site",
+	}
+}
