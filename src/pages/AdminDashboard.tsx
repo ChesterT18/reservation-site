@@ -59,13 +59,13 @@ const AdminDashboard: React.FC = () => {
       setTopReservedTables(getTopReservedTables(apiReservations, apiDiningTables, startYear, endYear));
       setTopOrderedFood(getTopOrderedFood(apiReservations, startYear, endYear));
       setFeedbackSummary(getAverageRatingsByCategory(apiFeedbacks, startYear, endYear));
-      const a = getTopRatedFoods(apiMenu, startYear, endYear);
-      const topmenu: MenuItem[] = [];
-      a.forEach(i => {
-        const m = apiMenu.find(x => x.id === i.foodId);
-        if (m) topmenu.push(m);
+      const topRatedFoodsInsight = getTopRatedFoods(apiMenu, startYear, endYear);
+      const topMenu: MenuItem[] = [];
+      topRatedFoodsInsight.forEach(ins => {
+        const m = apiMenu.find(am => am.id === ins.foodId);
+        if (m) topMenu.push(m);
       })
-      setTopRatedFood(topmenu);
+      setTopRatedFood(topMenu);
     }
   };
 
@@ -76,7 +76,17 @@ const AdminDashboard: React.FC = () => {
     setMonthlyPeakHours(getMonthlyPeakHours(reservations, startYear, endYear));
     setDailyTotalGuests(getDailyTotalGuests(reservations, startYear, endYear));
     setMonthlyTotalGuests(getMonthlyTotalGuests(reservations, startYear, endYear));
-  }, [reservations, startYear, endYear]);
+    setTopReservedTables(getTopReservedTables(reservations, diningTables, startYear, endYear));
+    setTopOrderedFood(getTopOrderedFood(reservations, startYear, endYear));
+    setFeedbackSummary(getAverageRatingsByCategory(feedbacks, startYear, endYear));
+    const topRatedFoodsInsight = getTopRatedFoods(menuItems, startYear, endYear);
+    const topMenu: MenuItem[] = [];
+    topRatedFoodsInsight.forEach(ins => {
+      const m = menuItems.find(am => am.id === ins.foodId);
+      if (m) topMenu.push(m);
+    })
+    setTopRatedFood(topMenu);
+  }, [reservations, feedbacks, diningTables, menuItems, startYear, endYear]);
 
   const renderStars = (averageRating: number, perfectRating: number) => {
     const stars = [];
@@ -100,9 +110,9 @@ const AdminDashboard: React.FC = () => {
     await loadData();
   };
 
-  const handleMenuSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-  };
+  // const handleMenuSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
+  // };
   
   return (
     <div className="min-h-screen py-12">
@@ -547,9 +557,9 @@ const AdminDashboard: React.FC = () => {
                             name: label,
                             value: topOrderedFood.data[index] || 0
                           }))}
-                          cx="35%"
+                          cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
                         >
@@ -595,9 +605,9 @@ const AdminDashboard: React.FC = () => {
                             name: label,
                             value: topReservedTables.data[index] || 0
                           }))}
-                          cx="35%"
+                          cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
                         >

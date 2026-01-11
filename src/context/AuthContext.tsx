@@ -27,19 +27,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(false);
 
     // Add pagehide event listener to detect tab close
-    const handlePageHide = (event: PageTransitionEvent) => {
-      // Only logout if the page is being unloaded (not just hidden/restored)
-      if (!event.persisted) {
-        logout();
-      }
-    };
+    // const handlePageHide = (event: PageTransitionEvent) => {
+    //   // Only logout if the page is being unloaded (not just hidden/restored)
+    //   if (!event.persisted) {
+    //     logout();
+    //   }
+    // };
 
-    window.addEventListener('pagehide', handlePageHide);
+    // window.addEventListener('pagehide', handlePageHide);
 
     // Cleanup function to remove the event listener
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide);
-    };
+    // return () => {
+    //   window.removeEventListener('pagehide', handlePageHide);
+    // };
   }, [logout]);
 
   const login = (userData: User) => {
